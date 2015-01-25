@@ -34,7 +34,7 @@ class Person implements Comparable<Person> {
   }
   
   public int compareTo(Person obj) {
-    return this.name.compareTo(obj.name);
+    return this.compareTo(obj);
   }
   
   public String toString() {
