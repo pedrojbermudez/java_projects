@@ -1,3 +1,7 @@
+/*
+ * @author Pedro Javier Bermudez Araguez
+ * 
+ */
 package secretSanta;
 
 import java.io.File;

@@ -1,3 +1,7 @@
+/*
+ * @author Pedro Javier Bermudez Araguez
+ * 
+ */
 package secretSanta;
 class Person implements Comparable<Person> {
 	private String name;
