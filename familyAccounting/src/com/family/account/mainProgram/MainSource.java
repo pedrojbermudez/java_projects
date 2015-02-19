@@ -575,7 +575,7 @@ public class MainSource extends JPanel implements ActionListener {
 				}
 
 			}
-
+			createAndShowGUI(1);
 			break;
 		case "cancel":
 			frame2.dispatchEvent(new WindowEvent(frame2,
