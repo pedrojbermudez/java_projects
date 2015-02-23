@@ -1027,8 +1027,8 @@ public class MainSource extends JPanel implements ActionListener {
 					JOptionPane.showMessageDialog(null,
 							"Both income and outgoing can't be empty.");
 				}
-
 			}
+			createAndShowGUI(1);
 			break;
 		case "cancel":
 			// Exit in create or edit frame.
@@ -1052,7 +1052,6 @@ public class MainSource extends JPanel implements ActionListener {
 	 * @return
 	 */
 	private static void createAndShowGUI(int mode) {
-		long starTime = System.nanoTime();
 		MainSource mainSource = new MainSource(mode);
 		JMenuBar menuBar = mainSource.createMenuBar(mode);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -1063,8 +1062,6 @@ public class MainSource extends JPanel implements ActionListener {
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
-		long endTime = System.nanoTime();
-		System.out.println((endTime - starTime)+"ns");
 	}
 
 	/**
