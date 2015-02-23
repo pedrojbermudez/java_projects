@@ -10,6 +10,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Vector;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -31,27 +32,35 @@ import com.family.account.libraries.DataBase;
 
 public class MainSource extends JPanel implements ActionListener {
 	private static final long serialVersionUID = -3040429246924352278L;
+	private static final String REGEX_DECIMAL = "\\d+([.]\\d{1,2})?";
+	private final String ENTER = "Enter";
+	private final String CANCEL = "Cancel";
+	private final String EDIT = "Edit";
+	private final int START_YEAR_COUNT = 2000;
+	private final int TOTAL_YEARS = 50;
+	private final String[] SOURCE_NAME_COL = { "#", "Name", "Total" };
+	private final String[] MOVEMENT_NAME_COL = { "#", "Name", "Source", "Date",
+			"Income", "Outgoing" };
+	private final static String DATABASE_PATH = "program_file";
 
 	private String[] columnNames;
 	private Object[][] rawData;
 	private ArrayList<String[]> listData;
 	private int numCol;
-	private final String ENTER = "Enter";
-	private final String CANCEL = "Cancel";
-	private final String EDIT = "Edit";
-	private final static String[] SOURCE_NAME_COL = { "#", "Name", "Total" };
-	private final static String[] MOVEMENT_NAME_COL = { "#", "Name", "Source",
-			"Date", "Income", "Outgoing" };
-	private final static String DATABASE_PATH = System.getProperty("user.home")
-			+ File.separator + "test_jarrr";
 	private static JFrame frame = new JFrame("Family Accounting");
 	private static JFrame frame2 = new JFrame("Family Accounting");
 	private static JTextField name, total, income, outgoing;
-	private static JComboBox<String> list;
+	private static JComboBox<String> list, month, day, year;
 	private static DataBase db = new DataBase(DATABASE_PATH);
-	private JTable table;
-	private int rowSelected;
-	
+	private static JTable table;
+	private int databaseId;
+
+	/**
+	 * Display the indicate table with mode.
+	 * 
+	 * @param mode
+	 *            Number that indicates if it is money source or movement.
+	 */
 	public MainSource(int mode) {
 		super(new GridLayout(1, 0));
 		switch (mode) {
@@ -66,9 +75,10 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			if (rawData != null) {
 				for (int i = 0; i < listData.size(); i++) {
-					rawData[i] = listData.get(i);
+					Object[] tmp = {i+1, listData.get(i)[1], listData.get(i)[2]};
+					rawData[i] = tmp;
 				}
-				createTable(rawData, columnNames, numCol);
+				createTable(rawData, columnNames);
 			} else {
 				createTable(columnNames, numCol);
 			}
@@ -84,12 +94,12 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			if (rawData != null) {
 				for (int i = 0; i < listData.size(); i++) {
-					String[] tmp = { listData.get(i)[0], listData.get(i)[1],
+					String[] tmp = {Integer.toString(i+1), listData.get(i)[1],
 							listData.get(i)[2], listData.get(i)[3],
 							listData.get(i)[4], listData.get(i)[5] };
 					rawData[i] = tmp;
 				}
-				createTable(rawData, columnNames, numCol);
+				createTable(rawData, columnNames);
 			} else {
 				createTable(columnNames, numCol);
 			}
@@ -97,12 +107,22 @@ public class MainSource extends JPanel implements ActionListener {
 		}
 	}
 
-	public MainSource(int mode, int id){
+	/**
+	 * Used to edit both money source or movement.
+	 * 
+	 * @param mode
+	 *            Number that indicates if it is money source or movement.
+	 * @param id
+	 *            The id in the database.
+	 */
+	public MainSource(int mode, int id) {
 		JLabel header;
-		JButton acceptButton = new JButton(ENTER);
 		JButton cancelButton = new JButton(CANCEL);
+		JButton editButton = new JButton(EDIT);
 		String[] getter;
-		
+		ArrayList<String[]> sourceList = db.getSources();
+		ArrayList<String> tmp = new ArrayList<String>();
+
 		frame2 = new JFrame();
 		frame2.setAlwaysOnTop(true);
 		Container pane = frame2.getContentPane();
@@ -111,13 +131,11 @@ public class MainSource extends JPanel implements ActionListener {
 		pane.setLayout(null);
 		cancelButton.setActionCommand("cancel");
 		cancelButton.addActionListener(this);
-		
-		switch(mode){
+
+		switch (mode) {
 		case 0:
-			rowSelected = table.getSelectedRow();
 			getter = db.getSource(id);
-			getter.equals("");
-			frame2.setTitle("New Source");
+			frame2.setTitle("Edit Source: " + getter[0]);
 			header = new JLabel("Name of source:");
 			pane.add(header);
 			header.setBounds(insets.left + 5, insets.top + 5,
@@ -125,8 +143,8 @@ public class MainSource extends JPanel implements ActionListener {
 					header.getPreferredSize().height);
 			name = new JTextField(20);
 			total = new JTextField(10);
-			acceptButton.setActionCommand("create_source");
-			acceptButton.addActionListener(this);
+			editButton.setActionCommand("edit_source_finished");
+			editButton.addActionListener(this);
 			name.addActionListener(this);
 			pane.add(name);
 			name.setBounds(header.getX() + header.getWidth() + 5,
@@ -139,32 +157,50 @@ public class MainSource extends JPanel implements ActionListener {
 					+ 5, header.getPreferredSize().width,
 					header.getPreferredSize().height);
 			pane.add(total);
-			pane.add(acceptButton);
+			pane.add(editButton);
 			pane.add(cancelButton);
 			total.setBounds(header.getX() + header.getWidth() + 5,
 					header.getY(), total.getPreferredSize().width,
 					total.getPreferredSize().height);
-			acceptButton.setBounds(insets.left + 100,
+			editButton.setBounds(insets.left + 100,
 					header.getY() + header.getHeight() + 20,
-					acceptButton.getPreferredSize().width,
-					acceptButton.getPreferredSize().height);
-			cancelButton.setBounds(
-					acceptButton.getX() + acceptButton.getWidth() + 5,
-					acceptButton.getY(), cancelButton.getPreferredSize().width,
+					editButton.getPreferredSize().width,
+					editButton.getPreferredSize().height);
+			cancelButton.setBounds(editButton.getX() + editButton.getWidth()
+					+ 5, editButton.getY(),
+					cancelButton.getPreferredSize().width,
 					cancelButton.getPreferredSize().height);
 			frame2.setMinimumSize(new Dimension(360, 120));
+			name.setText(getter[0]);
+			total.setText(getter[1]);
+			databaseId = id;
 			break;
 		case 1:
-			ArrayList<String[]> sourceList = db.getSources();
-			ArrayList<String> tmp = new ArrayList<String>();
+			getter = db.getMovement(id);
 
-			frame.setTitle("New Movement");
+			String[] months = { "January", "February", "March", "April", "May",
+					"June", "July", "August", "September", "October",
+					"November", "December" };
+			String[] days = new String[31];
+			String[] years = new String[TOTAL_YEARS];
+			for (int i = 0; i < days.length; i++) {
+				days[i] = Integer.toString(i + 1);
+			}
+
+			for (int i = 0; i < years.length; i++) {
+				years[i] = Integer.toString(START_YEAR_COUNT + i);
+			}
+
+			frame2.setTitle("Edit Movement");
 
 			for (int i = 0; i < sourceList.size(); i++) {
-				tmp.add(sourceList.get(i)[1]);
+				tmp.add(sourceList.get(i)[6] + " - " + sourceList.get(i)[1]);
 			}
 
 			list = new JComboBox<String>(tmp.toArray(new String[tmp.size()]));
+			month = new JComboBox<String>(months);
+			day = new JComboBox<String>(days);
+			year = new JComboBox<String>(years);
 
 			// Name for movement.
 			header = new JLabel("Enter the name for this movement: ");
@@ -189,10 +225,28 @@ public class MainSource extends JPanel implements ActionListener {
 					header.getY(), list.getPreferredSize().width,
 					list.getPreferredSize().height);
 
+			// Date picker
+			header = new JLabel("Introduce the date (mm/dd/yyyy)");
+			pane.add(header);
+			pane.add(month);
+			pane.add(day);
+			pane.add(year);
+			header.setBounds(insets.left + 5, list.getY() + list.getHeight()
+					+ 10, header.getPreferredSize().width,
+					header.getPreferredSize().height);
+			month.setBounds(header.getX() + header.getWidth() + 5,
+					header.getY(), month.getPreferredSize().width,
+					month.getPreferredSize().height);
+			day.setBounds(month.getX() + month.getWidth() + 5, header.getY(),
+					day.getPreferredSize().width, day.getPreferredSize().height);
+			year.setBounds(day.getX() + day.getWidth() + 5, header.getY(),
+					year.getPreferredSize().width,
+					year.getPreferredSize().height);
+
 			// A little info.
 			JLabel info = new JLabel("Introduce one:");
 			pane.add(info);
-			info.setBounds(insets.left + 5, list.getY() + list.getHeight() + 5,
+			info.setBounds(insets.left + 5, day.getY() + day.getHeight() + 5,
 					info.getPreferredSize().width,
 					info.getPreferredSize().height);
 
@@ -222,24 +276,47 @@ public class MainSource extends JPanel implements ActionListener {
 					outgoing.getPreferredSize().height);
 
 			// Button creation.
-			acceptButton.setActionCommand("create_movement");
-			acceptButton.addActionListener(this);
-			pane.add(acceptButton);
+			editButton.setActionCommand("edit_movement_finished");
+			editButton.addActionListener(this);
+			pane.add(editButton);
 			pane.add(cancelButton);
-			acceptButton.setBounds(insets.left + 5,
+			editButton.setBounds(insets.left + 5,
 					outgoing.getY() + outgoing.getHeight() + 10,
-					acceptButton.getPreferredSize().width,
-					acceptButton.getPreferredSize().height);
-			cancelButton.setBounds(
-					acceptButton.getX() + acceptButton.getWidth() + 5,
-					acceptButton.getY(), cancelButton.getPreferredSize().width,
+					editButton.getPreferredSize().width,
+					editButton.getPreferredSize().height);
+			cancelButton.setBounds(editButton.getX() + editButton.getWidth()
+					+ 5, editButton.getY(),
+					cancelButton.getPreferredSize().width,
 					cancelButton.getPreferredSize().height);
 
 			frame2.setMinimumSize(new Dimension(800, 500));
+
+			String[] dateSplit = getter[2].split("-");
+
+			name.setText(getter[0]);
+			income.setText(getter[3]);
+			outgoing.setText(getter[4]);
+			list.setSelectedIndex(Integer.parseInt(getter[6]) - 1);
+			month.setSelectedIndex(Integer.parseInt(dateSplit[1]) - 1);
+			day.setSelectedIndex(Integer.parseInt(dateSplit[2]) - 1);
+			year.setSelectedIndex(Integer.parseInt(dateSplit[0])
+					- START_YEAR_COUNT);
+			databaseId = id;
 			break;
 		}
+		frame2.setResizable(false);
+		frame2.pack();
+		frame2.setVisible(true);
 	}
-	
+
+	/**
+	 * Used to create a new money source or movement.
+	 * 
+	 * @param mode
+	 *            Number that indicates if it is money source or movement.
+	 * @param activated
+	 *            Just a parameter to difference to other constructors.
+	 */
 	public MainSource(int mode, boolean activated) {
 		JLabel header;
 		JButton acceptButton = new JButton(ENTER);
@@ -253,36 +330,41 @@ public class MainSource extends JPanel implements ActionListener {
 		pane.setLayout(null);
 		cancelButton.setActionCommand("cancel");
 		cancelButton.addActionListener(this);
-		
+
 		switch (mode) {
 		case 0:
 			frame2.setTitle("New Source");
+
+			// Name input field
 			header = new JLabel("Name of source:");
 			pane.add(header);
 			header.setBounds(insets.left + 5, insets.top + 5,
 					header.getPreferredSize().width,
 					header.getPreferredSize().height);
 			name = new JTextField(20);
-			total = new JTextField(10);
-			acceptButton.setActionCommand("create_source");
-			acceptButton.addActionListener(this);
 			name.addActionListener(this);
 			pane.add(name);
 			name.setBounds(header.getX() + header.getWidth() + 5,
 					insets.top + 5, name.getPreferredSize().width,
 					name.getPreferredSize().height);
 
+			// Total money input
 			header = new JLabel("Total money on the source:");
 			pane.add(header);
 			header.setBounds(insets.left + 5, name.getY() + name.getHeight()
 					+ 5, header.getPreferredSize().width,
 					header.getPreferredSize().height);
+			total = new JTextField(10);
 			pane.add(total);
-			pane.add(acceptButton);
-			pane.add(cancelButton);
 			total.setBounds(header.getX() + header.getWidth() + 5,
 					header.getY(), total.getPreferredSize().width,
 					total.getPreferredSize().height);
+
+			// Buttons (accept and cancel)
+			pane.add(acceptButton);
+			pane.add(cancelButton);
+			acceptButton.setActionCommand("create_source");
+			acceptButton.addActionListener(this);
 			acceptButton.setBounds(insets.left + 100,
 					header.getY() + header.getHeight() + 20,
 					acceptButton.getPreferredSize().width,
@@ -295,15 +377,31 @@ public class MainSource extends JPanel implements ActionListener {
 			break;
 		case 1:
 			ArrayList<String[]> sourceList = db.getSources();
-			ArrayList<String> tmp = new ArrayList<String>();
-
-			frame.setTitle("New Movement");
-
-			for (int i = 0; i < sourceList.size(); i++) {
-				tmp.add(sourceList.get(i)[1]);
+			Vector tmp = new Vector();
+			String[] months = { "January", "February", "March", "April", "May",
+					"June", "July", "August", "September", "October",
+					"November", "December" };
+			String[] days = new String[31];
+			String[] years = new String[TOTAL_YEARS];
+			for (int i = 0; i < days.length; i++) {
+				days[i] = Integer.toString(i + 1);
 			}
 
-			list = new JComboBox<String>(tmp.toArray(new String[tmp.size()]));
+			for (int i = 0; i < years.length; i++) {
+				years[i] = Integer.toString(START_YEAR_COUNT + i);
+			}
+
+			frame2.setTitle("New Movement");
+
+			for (int i = 0; i < sourceList.size(); i++) {
+				tmp.addElement(new Item(Integer.parseInt(sourceList.get(i)[0]),
+						sourceList.get(i)[1]));
+			}
+
+			list = new JComboBox(tmp);
+			month = new JComboBox<String>(months);
+			day = new JComboBox<String>(days);
+			year = new JComboBox<String>(years);
 
 			// Name for movement.
 			header = new JLabel("Enter the name for this movement: ");
@@ -328,10 +426,28 @@ public class MainSource extends JPanel implements ActionListener {
 					header.getY(), list.getPreferredSize().width,
 					list.getPreferredSize().height);
 
+			// Date picker.
+			header = new JLabel("Introduce the date (mm/dd/yyyy): ");
+			pane.add(header);
+			pane.add(month);
+			pane.add(day);
+			pane.add(year);
+			header.setBounds(insets.left + 5, list.getY() + list.getHeight()
+					+ 10, header.getPreferredSize().width,
+					header.getPreferredSize().height);
+			month.setBounds(header.getX() + header.getWidth() + 5,
+					header.getY(), month.getPreferredSize().width,
+					month.getPreferredSize().height);
+			day.setBounds(month.getX() + month.getWidth() + 5, header.getY(),
+					day.getPreferredSize().width, day.getPreferredSize().height);
+			year.setBounds(day.getX() + day.getWidth() + 5, header.getY(),
+					year.getPreferredSize().width,
+					year.getPreferredSize().height);
+
 			// A little info.
 			JLabel info = new JLabel("Introduce one:");
 			pane.add(info);
-			info.setBounds(insets.left + 5, list.getY() + list.getHeight() + 5,
+			info.setBounds(insets.left + 5, day.getY() + day.getHeight() + 5,
 					info.getPreferredSize().width,
 					info.getPreferredSize().height);
 
@@ -376,14 +492,23 @@ public class MainSource extends JPanel implements ActionListener {
 
 			frame2.setMinimumSize(new Dimension(800, 500));
 			break;
-				}
+		}
 
 		frame2.setResizable(false);
 		frame2.pack();
 		frame2.setVisible(true);
 	}
 
-	public JTable createTable(Object[][] data, String[] colsName, int numCols) {
+	/**
+	 * Used when the database has got some data.
+	 * 
+	 * @param data
+	 *            The same parameters in JTable constructor
+	 * @param colsName
+	 *            The same parameters in JTable constructor
+	 * @return Return the JTable
+	 */
+	public void createTable(Object[][] data, String[] colsName) {
 		table = new JTable(data, colsName);
 		table.setPreferredScrollableViewportSize(new Dimension(800, 600));
 		table.setFillsViewportHeight(true);
@@ -414,10 +539,18 @@ public class MainSource extends JPanel implements ActionListener {
 				JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		add(scrollPane);
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-		return table;
 	}
 
-	public JTable createTable(String[] colsName, int numCols) {
+	/**
+	 * Used when you haven't got some data into the database.
+	 * 
+	 * @param colsName
+	 *            Columns name used to display in the header.
+	 * @param numCols
+	 *            Number of column to pass to JTable constructor
+	 * @return
+	 */
+	public void createTable(String[] colsName, int numCols) {
 		table = new JTable(0, numCol);
 		table.setPreferredScrollableViewportSize(new Dimension(800, 600));
 		table.setFillsViewportHeight(true);
@@ -438,135 +571,320 @@ public class MainSource extends JPanel implements ActionListener {
 				JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		add(scrollPane);
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-		return table;
 	}
 
-	public JMenuBar createMenuBar() {
-		JMenuBar menuBar;
+	public JMenuBar createMenuBar(int mode) {
+		JMenuBar menuBar = null;
 		JMenu menu, submenu;
 		JMenuItem menuItem;
+		ImageIcon icon = new ImageIcon("exit.png");
+		;
 
-		// Create the menu bar.
-		menuBar = new JMenuBar();
+		switch (mode) {
+		case 0:
+			// Create the menu bar.
+			menuBar = new JMenuBar();
 
-		// File menu
-		menu = new JMenu("File");
-		menu.setMnemonic(KeyEvent.VK_F);
-		menuBar.add(menu);
+			// File menu
+			menu = new JMenu("File");
+			menu.setMnemonic(KeyEvent.VK_F);
+			menuBar.add(menu);
 
-		// Sub-menu new
-		submenu = new JMenu("New");
-		submenu.setMnemonic(KeyEvent.VK_N);
+			// Sub-menu new
+			submenu = new JMenu("New");
+			submenu.setMnemonic(KeyEvent.VK_N);
 
-		menuItem = new JMenuItem("Source");
-		menuItem.setActionCommand("new_source");
-		menuItem.addActionListener(this);
-		// menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2,
-		// ActionEvent.ALT_MASK));
-		submenu.add(menuItem);
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("new_source");
+			menuItem.addActionListener(this);
 
-		menuItem = new JMenuItem("Movement");
-		submenu.add(menuItem);
-		menuItem.setActionCommand("new_movement");
-		menuItem.addActionListener(this);
-		menu.add(submenu);
+			// menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2,
+			// ActionEvent.ALT_MASK));
+			submenu.add(menuItem);
 
-		// Sub-menu Edit
-		submenu = new JMenu("Edit");
-		submenu.setMnemonic(KeyEvent.VK_E);
-		menuItem = new JMenuItem("Source");
-		menuItem.setActionCommand("edit_source");
-		menuItem.addActionListener(this);
-		submenu.add(menuItem);
+			menuItem = new JMenuItem("Movement");
+			submenu.add(menuItem);
+			menuItem.setActionCommand("new_movement");
+			menuItem.addActionListener(this);
+			menu.add(submenu);
 
-		menuItem = new JMenuItem("Movement");
-		menuItem.setActionCommand("edit_movement");
-		menuItem.addActionListener(this);
-		submenu.add(menuItem);
-		menu.add(submenu);
+			// Edit source
+			menuItem = new JMenuItem("Edit money source");
+			menuItem.setActionCommand("edit_source");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
 
-		menu.addSeparator();
+			// Delete source
+			menuItem = new JMenuItem("Delete money source");
+			menuItem.setActionCommand("delete_source");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menu.addSeparator();
 
-		ImageIcon icon = new ImageIcon("/home/pedro/Imágenes/imagen.jpeg");
-		menuItem = new JMenuItem("Exit", icon);
-		menuItem.setMnemonic(KeyEvent.VK_E);
-		menuItem.setActionCommand("exit");
-		menuItem.addActionListener(this);
-		menu.add(menuItem);
+			menuItem = new JMenuItem("Exit", icon);
+			menuItem.setMnemonic(KeyEvent.VK_E);
+			menuItem.setActionCommand("exit");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
 
-		// View menu
-		menu = new JMenu("View");
-		menuItem = new JMenuItem("Source");
-		menuItem.setActionCommand("view_source");
-		menuItem.addActionListener(this);
-		menu.add(menuItem);
-		menuItem = new JMenuItem("Movements");
-		menuItem.setActionCommand("view_movements");
-		menuItem.addActionListener(this);
-		menu.add(menuItem);
-		menuBar.add(menu);
+			// View menu
+			menu = new JMenu("View");
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("view_source");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuItem = new JMenuItem("Movements");
+			menuItem.setActionCommand("view_movements");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuBar.add(menu);
+			break;
+
+		case 1:
+			// Create the menu bar.
+			menuBar = new JMenuBar();
+
+			// File menu
+			menu = new JMenu("File");
+			menu.setMnemonic(KeyEvent.VK_F);
+			menuBar.add(menu);
+
+			// Sub-menu new
+			submenu = new JMenu("New");
+			submenu.setMnemonic(KeyEvent.VK_N);
+
+			// Menu item in new
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("new_source");
+			menuItem.addActionListener(this);
+			submenu.add(menuItem);
+
+			// Menu item in new
+			menuItem = new JMenuItem("Movement");
+			submenu.add(menuItem);
+			menuItem.setActionCommand("new_movement");
+			menuItem.addActionListener(this);
+			menu.add(submenu);
+
+			// Edit movement
+			menuItem = new JMenuItem("Edit movement");
+			menuItem.setActionCommand("edit_movement");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+
+			// Delete movement
+			menuItem = new JMenuItem("Delete movement");
+			menuItem.setActionCommand("delete_movement");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menu.addSeparator();
+
+			menuItem = new JMenuItem("Exit", icon);
+			menuItem.setMnemonic(KeyEvent.VK_E);
+			menuItem.setActionCommand("exit");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+
+			// View menu
+			menu = new JMenu("View");
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("view_source");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuItem = new JMenuItem("Movements");
+			menuItem.setActionCommand("view_movements");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuBar.add(menu);
+			break;
+
+		default:
+			// Create the menu bar.
+			menuBar = new JMenuBar();
+
+			// File menu
+			menu = new JMenu("File");
+			menu.setMnemonic(KeyEvent.VK_F);
+			menuBar.add(menu);
+
+			// Sub-menu new
+			submenu = new JMenu("New");
+			submenu.setMnemonic(KeyEvent.VK_N);
+
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("new_source");
+			menuItem.addActionListener(this);
+			// menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_2,
+			// ActionEvent.ALT_MASK));
+			submenu.add(menuItem);
+
+			menuItem = new JMenuItem("Movement");
+			submenu.add(menuItem);
+			menuItem.setActionCommand("new_movement");
+			menuItem.addActionListener(this);
+			menu.add(submenu);
+
+			menuItem = new JMenuItem("Exit", icon);
+			menuItem.setMnemonic(KeyEvent.VK_E);
+			menuItem.setActionCommand("exit");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+
+			// View menu
+			menu = new JMenu("View");
+			menuItem = new JMenuItem("Money source");
+			menuItem.setActionCommand("view_source");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuItem = new JMenuItem("Movements");
+			menuItem.setActionCommand("view_movements");
+			menuItem.addActionListener(this);
+			menu.add(menuItem);
+			menuBar.add(menu);
+			break;
+		}
 		return menuBar;
 	}
 
 	public void actionPerformed(ActionEvent e) {
+		String incomeTmp, outgoingTmp, monthTmp, dayTmp, date;
+		double incomeResult, outgoingResult;
+		int selectedRow;
+
 		switch (e.getActionCommand()) {
 		case "new_source":
+			// User clicks on the menu in File -> New -> Money Source
+
 			createAndShowGUI(0, false);
 			break;
 		case "new_movement":
+			// User clicks on the menu in File -> New -> Movement
+
 			createAndShowGUI(1, false);
 			break;
 		case "edit_source":
-			break;
-		case "edit_movement":
-			break;
-		case "view_source":
-			createAndShowGUI(0);
-			break;
-		case "view_movements":
-			createAndShowGUI(1);
-			break;
-		case "create_source":
-			db.newSource(name.getText(), Double.parseDouble(total.getText()));
-			frame2.dispatchEvent(new WindowEvent(frame2,
-					WindowEvent.WINDOW_CLOSING));
-			createAndShowGUI(0);
-			break;
-		case "create_movement":
-			String incomeResult,
-			outgoingResult;
-			if ((!income.getText().equals("") || !outgoing.getText().equals(""))
-					&& !name.getText().equals("")) {
-				if (income.getText().equals("")) {
-					incomeResult = "0.0";
-				} else {
-					incomeResult = income.getText().replace(',', '.');
-				}
+			// User clicks on the menu in File -> Edit Money Source
 
-				if (outgoing.getText().equals("")) {
-					outgoingResult = "0.0";
-				} else {
-					outgoingResult = outgoing.getText().replace(',', '.');
-				}
-				System.out.println("Regex works for incomeResult("
-						+ incomeResult + "): "
-						+ incomeResult.matches("\\d+([.]\\d{1,2})?"));
-				System.out.println("Regex works for outgoingResults("
-						+ outgoingResult + "): "
-						+ outgoingResult.matches("\\d+([.]\\d{1,2})?"));
-				if (incomeResult.matches("\\d+([.]\\d{1,2})?")
-						&& outgoingResult.matches("\\d+([.]\\d{1,2})?")) {
-					System.out.println("Cumple");
-					db.newMovement(list.getSelectedIndex() + 1, name.getText(),
-							"2015/12/05", Double.parseDouble(incomeResult),
-							Double.parseDouble(outgoingResult));
+			selectedRow = table.getSelectedRow();
+			if (selectedRow != -1) {
+				createAndShowGUI(0, Integer.parseInt(listData.get(selectedRow)[0]));
+			} else {
+				JOptionPane.showMessageDialog(null, "Select a money source.");
+			}
+
+			break;
+		case "edit_source_finished":
+			// User clicks edit button in edit money source.
+
+			// Check if user lest name and total fields empty.
+			if (!total.getText().equals("") && !name.getText().equals("")) {
+				// Change text and check if a number and if it has decimal check
+				// if the correct format.
+				if (total.getText().replace(',', '.').matches(REGEX_DECIMAL)) {
+					db.editSource(databaseId, name.getText(),
+							Double.parseDouble(total.getText()));
 					frame2.dispatchEvent(new WindowEvent(frame2,
 							WindowEvent.WINDOW_CLOSING));
+					createAndShowGUI(0);
 				} else {
 					JOptionPane.showMessageDialog(null,
-							"Number format incorrect");
+							"Number format incorrect.");
 				}
 			} else {
+				// Display a message if name or total is empty.
+				if (name.getText().equals("")) {
+					JOptionPane.showMessageDialog(null, "Name can't be empty.");
+				} else {
+					JOptionPane
+							.showMessageDialog(null, "Total can't be empty.");
+				}
+			}
+			break;
+		case "edit_movement":
+			// User clicks on the menu in File -> Edit movement.
+
+			selectedRow = table.getSelectedRow();
+			if (selectedRow != -1) {
+				createAndShowGUI(1, Integer.parseInt(listData.get(selectedRow)[0]));
+			} else {
+				JOptionPane.showMessageDialog(null, "Select a movement.");
+			}
+			break;
+		case "edit_movement_finished":
+			// Called when user clicks on edit button in edit movement.
+
+			// Check if user lets income, outgoing and name fields empty.
+			if ((!income.getText().equals("") || !outgoing.getText().equals(""))
+					&& !name.getText().equals("")) {
+				// Check if income is empty or not.
+				if (income.getText().equals("")) {
+					incomeTmp = "0.00";
+				} else {
+					incomeTmp = income.getText().replace(',', '.');
+				}
+
+				// Check if outgoing is empty or not.
+				if (outgoing.getText().equals("")) {
+					outgoingTmp = "0.00";
+				} else {
+					outgoingTmp = outgoing.getText().replace(',', '.');
+				}
+
+				// Check if income and outgoing are numbers and check if were
+				// typed correctly.
+				if (incomeTmp.matches(REGEX_DECIMAL)
+						&& outgoingTmp.matches(REGEX_DECIMAL)) {
+					incomeResult = Double.parseDouble(incomeTmp);
+					outgoingResult = Double.parseDouble(outgoingTmp);
+
+					// Check if user types in income and outgoing at the same
+					// time.
+					if (incomeResult > 0 && outgoingResult > 0) {
+						JOptionPane.showMessageDialog(null,
+								"Income and Outgoing can't be together.");
+					} else {
+						// Format month date.
+						if (month.getSelectedIndex() + 1 < 10) {
+							monthTmp = "0"
+									+ Integer
+											.toString(month.getSelectedIndex() + 1);
+						} else {
+							monthTmp = Integer.toString(month
+									.getSelectedIndex() + 1);
+						}
+
+						// Format day date.
+						if (day.getSelectedIndex() + 1 < 10) {
+							dayTmp = "0"
+									+ Integer
+											.toString(day.getSelectedIndex() + 1);
+						} else {
+							dayTmp = Integer
+									.toString(day.getSelectedIndex() + 1);
+						}
+
+						// Create date with database format.
+						date = Integer.toString(START_YEAR_COUNT
+								+ year.getSelectedIndex())
+								+ "-" + monthTmp + "-" + dayTmp;
+
+						db.editMovement(databaseId,
+								((Item) list.getSelectedItem()).getId(),
+								name.getText(), date,
+								Double.parseDouble(income.getText()),
+								Double.parseDouble(outgoing.getText()));
+						frame2.dispatchEvent(new WindowEvent(frame2,
+								WindowEvent.WINDOW_CLOSING));
+						createAndShowGUI(1);
+					}
+
+				} else {
+					JOptionPane.showMessageDialog(null,
+							"Number format incorrect.");
+				}
+			} else {
+				// Check if name is empty and show a message.In the other case
+				// income and outgoing are empty.
 				if (name.getText().equals("")) {
 					JOptionPane.showMessageDialog(null, "Name can't be empty.");
 				} else {
@@ -577,20 +895,167 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 
 			break;
+		case "delete_source":
+			// Delete a money source.
+
+			selectedRow = table.getSelectedRow();
+			if (selectedRow != -1) {
+				int confirm = JOptionPane
+						.showConfirmDialog(
+								null,
+								"Are you sure you want to delete? Also all movements will be deleted.",
+								"Confirm", JOptionPane.YES_NO_OPTION);
+				if (confirm == 0) {
+					
+					db.deleteSource(Integer.parseInt(listData.get(selectedRow)[0]));
+					createAndShowGUI(0);
+				} 
+			} else {
+				JOptionPane.showMessageDialog(null,
+						"Please select a money source.");
+			}
+			break;
+		case "delete_movement":
+			// Delete a money source.
+			selectedRow = table.getSelectedRow();
+			if (selectedRow != -1) {
+				db.deleteMovement(Integer.parseInt(listData.get(selectedRow)[0]));
+				createAndShowGUI(1);
+			} else {
+				JOptionPane
+						.showMessageDialog(null, "Please select a movement.");
+			}
+			break;
+		case "view_source":
+			// User clicks on the menu in View -> View Money Source.
+
+			createAndShowGUI(0);
+			break;
+		case "view_movements":
+			// User clicks on the menu in View -> View Movement.
+
+			createAndShowGUI(1);
+			break;
+		case "create_source":
+			// User clicks on accept button in create money source.
+
+			// Check if total and name are not empty.
+			if (!total.getText().equals("") && !name.getText().equals("")) {
+				// Check if total has got desire format by application software.
+				if (total.getText().matches(REGEX_DECIMAL)) {
+					db.newSource(name.getText(),
+							Double.parseDouble(total.getText()));
+					frame2.dispatchEvent(new WindowEvent(frame2,
+							WindowEvent.WINDOW_CLOSING));
+					createAndShowGUI(0);
+				}
+
+			} else {
+				// Show a message if name or total is empty.
+				if (name.getText().equals("")) {
+					JOptionPane.showMessageDialog(null, "Name can't be empty.");
+				} else {
+					JOptionPane.showMessageDialog(null,
+							"Number format incorrect.");
+				}
+			}
+			break;
+		case "create_movement":
+			// Called when user clicks on accept button in create movement.
+
+			if ((!income.getText().equals("") || !outgoing.getText().equals(""))
+					&& !name.getText().equals("")) {
+				if (income.getText().equals("")) {
+					incomeTmp = "0.00";
+				} else {
+					incomeTmp = income.getText().replace(',', '.');
+				}
+
+				if (outgoing.getText().equals("")) {
+					outgoingTmp = "0.00";
+				} else {
+					outgoingTmp = outgoing.getText().replace(',', '.');
+				}
+				if (incomeTmp.matches(REGEX_DECIMAL)
+						&& outgoingTmp.matches(REGEX_DECIMAL)) {
+					incomeResult = Double.parseDouble(incomeTmp);
+					outgoingResult = Double.parseDouble(outgoingTmp);
+					if (incomeResult > 0 && outgoingResult > 0) {
+						JOptionPane.showMessageDialog(null,
+								"Icome and Outgoing can't be together.");
+					} else {
+						// Format month date.
+						if (month.getSelectedIndex() + 1 < 10) {
+							monthTmp = "0"
+									+ Integer
+											.toString(month.getSelectedIndex() + 1);
+						} else {
+							monthTmp = Integer.toString(month
+									.getSelectedIndex() + 1);
+						}
+
+						// Format day date.
+						if (day.getSelectedIndex() + 1 < 10) {
+							dayTmp = "0"
+									+ Integer
+											.toString(day.getSelectedIndex() + 1);
+						} else {
+							dayTmp = Integer
+									.toString(day.getSelectedIndex() + 1);
+						}
+
+						date = Integer.toString(START_YEAR_COUNT
+								+ year.getSelectedIndex())
+								+ "-" + monthTmp + "-" + dayTmp;
+
+						db.newMovement(((Item) list.getSelectedItem()).getId(),
+								name.getText(), date, incomeResult,
+								outgoingResult);
+						frame2.dispatchEvent(new WindowEvent(frame2,
+								WindowEvent.WINDOW_CLOSING));
+						createAndShowGUI(1);
+					}
+
+				} else {
+					JOptionPane.showMessageDialog(null,
+							"Number format incorrect.");
+				}
+			} else {
+				if (name.getText().equals("")) {
+					JOptionPane.showMessageDialog(null, "Name can't be empty.");
+				} else {
+					JOptionPane.showMessageDialog(null,
+							"Both income and outgoing can't be empty.");
+				}
+
+			}
+			break;
 		case "cancel":
+			// Exit in create or edit frame.
+
 			frame2.dispatchEvent(new WindowEvent(frame2,
 					WindowEvent.WINDOW_CLOSING));
 			break;
 		case "exit":
+			// Close the application.
+
 			System.exit(0);
 			break;
 		}
 	}
 
-	private static JFrame createAndShowGUI(int mode) {
+	/**
+	 * Show the GUI. This one is only to display a table
+	 * 
+	 * @param mode
+	 *            It indicates if must be displayed money source or movement.
+	 * @return
+	 */
+	private static void createAndShowGUI(int mode) {
+		long starTime = System.nanoTime();
 		MainSource mainSource = new MainSource(mode);
-		JMenuBar menuBar = mainSource.createMenuBar();
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		JMenuBar menuBar = mainSource.createMenuBar(mode);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setJMenuBar(menuBar);
 		mainSource.setOpaque(true);
 		frame.setContentPane(mainSource);
@@ -598,18 +1063,44 @@ public class MainSource extends JPanel implements ActionListener {
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
-		return frame;
+		long endTime = System.nanoTime();
+		System.out.println((endTime - starTime)+"ns");
 	}
 
-	private static JFrame createAndShowGUI(int mode, boolean table) {
+	/**
+	 * Used when we want to create a new money source or movement
+	 * 
+	 * @param mode
+	 *            It indicates if is money source or movement.
+	 * @param table
+	 *            Just for difference among other methods.
+	 */
+	private static void createAndShowGUI(int mode, boolean table) {
 		MainSource mainSource = new MainSource(mode, table);
-		JMenuBar menuBar = mainSource.createMenuBar();
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		JMenuBar menuBar = mainSource.createMenuBar(mode);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setJMenuBar(menuBar);
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
-		return frame;
+	}
+
+	/**
+	 * Used for edit frame.
+	 * 
+	 * @param mode
+	 *            Indicate if it is money source or movement.
+	 * @param id
+	 *            Id in database.
+	 */
+	private static void createAndShowGUI(int mode, int id) {
+		MainSource mainSource = new MainSource(mode, id);
+		JMenuBar menuBar = mainSource.createMenuBar(mode);
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setJMenuBar(menuBar);
+		frame.setVisible(true);
+		frame.revalidate();
+		frame.repaint();
 	}
 
 	public static void main(String[] args) {
@@ -620,6 +1111,5 @@ public class MainSource extends JPanel implements ActionListener {
 				createAndShowGUI(0);
 			}
 		});
-
 	}
 }

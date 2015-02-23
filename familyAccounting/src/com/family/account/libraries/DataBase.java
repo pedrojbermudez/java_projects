@@ -6,9 +6,8 @@ import java.sql.Statement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+
 
 public class DataBase {
 	private String path;
@@ -48,7 +47,6 @@ public class DataBase {
 		}
 		try {
 			conn = DriverManager.getConnection("jdbc:sqlite:" + path);
-			System.out.println("Connection realized - Path file: " + path);
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -71,7 +69,7 @@ public class DataBase {
 			stm.executeUpdate(createTable1);
 			stm.executeUpdate(createTable2);
 		} catch (SQLException e) {
-			System.err.println("Database exist");
+			System.err.println("Table o tables exist");
 		} finally {
 			try {
 				if (stm != null) {
@@ -92,12 +90,12 @@ public class DataBase {
 			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT + ";");
 			result = new ArrayList<String[]>();
 			while (rs.next()) {
-				Date date = rs.getDate("movement_date");
-				SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
+				String[] arrayTmp = rs.getString("movement_date").split("-");
+				String date = arrayTmp[2] + "-" + arrayTmp[1] + "-"
+						+ arrayTmp[0];
 				String[] tmp = { Integer.toString(rs.getInt("id")),
 						rs.getString("name"),
-						getSourceName(rs.getInt("source_id")),
-						sdf.format(date),
+						getSourceName(rs.getInt("source_id")), date,
 						Double.toString(rs.getDouble("income")),
 						Double.toString(rs.getDouble("outgoing")),
 						Integer.toString(rs.getInt("source_id")) };
@@ -149,16 +147,17 @@ public class DataBase {
 	public String[] getSource(int id) {
 		Statement stm = null;
 		ResultSet rs = null;
-		String[] result = new String[2]; 
+		String[] result = new String[2];
+
 		try {
 			stm = conn.createStatement();
-			 rs = stm.executeQuery("select name, total from " + TABLE_SOURCE
+			rs = stm.executeQuery("select name, total from " + TABLE_SOURCE
 					+ " where id=" + id);
-			 if(rs.next()){
-				 result[0] = rs.getString("name");
-				 result[1] = Double.toString(rs.getDouble("total"));
-			 }
-			 stm.close();
+			if (rs.next()) {
+				result[0] = rs.getString("name");
+				result[1] = Double.toString(rs.getDouble("total"));
+			}
+			stm.close();
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -170,7 +169,9 @@ public class DataBase {
 		try {
 			stm = conn.createStatement();
 			stm.executeUpdate("update " + TABLE_SOURCE + " set total=total+"
-					+ total + ";");
+					+ total + " where id=" + sourceId + ";");
+			System.out.println("sql updateTotal: " + "update " + TABLE_SOURCE + " set total=total+"
+					+ total + " where id=" + sourceId + ";");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -199,6 +200,7 @@ public class DataBase {
 	}
 
 	public String[] getMovement(int id) {
+		System.out.println(id);
 		Statement stm = null;
 		ResultSet rs = null;
 		String[] result = new String[7];
@@ -206,10 +208,10 @@ public class DataBase {
 			stm = conn.createStatement();
 			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT
 					+ " where id=" + id + ";");
-			if(rs.next()){
+			if (rs.next()) {
 				result[0] = rs.getString("name");
 				result[1] = getSourceName(rs.getInt("source_id"));
-				result[2] = rs.getString("date");
+				result[2] = rs.getString("movement_date");
 				result[3] = Double.toString(rs.getDouble("income"));
 				result[4] = Double.toString(rs.getDouble("outgoing"));
 				result[5] = Integer.toString(rs.getInt("id"));
@@ -230,7 +232,6 @@ public class DataBase {
 	}
 
 	public String getSourceName(int sourceId) {
-		System.out.println("Id: " + sourceId);
 		Statement stm = null;
 		ResultSet rs = null;
 		String name;
@@ -238,8 +239,6 @@ public class DataBase {
 			stm = conn.createStatement();
 			rs = stm.executeQuery("select * from " + TABLE_SOURCE
 					+ " where id=" + sourceId + ";");
-			System.out.println("select * from " + TABLE_SOURCE + " where id="
-					+ sourceId + ";");
 			if (rs.next())
 				name = rs.getString("name");
 			else
@@ -260,14 +259,10 @@ public class DataBase {
 	}
 
 	public void newSource(String name, double total) {
-		System.out.println(name);
-		System.out.println(total);
 		Statement stm = null;
 		try {
 			stm = conn.createStatement();
 			stm.executeUpdate("insert into " + TABLE_SOURCE
-					+ " (name, total) values ('" + name + "', " + total + ");");
-			System.out.println("insert into " + TABLE_SOURCE
 					+ " (name, total) values ('" + name + "', " + total + ");");
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -285,10 +280,30 @@ public class DataBase {
 
 	public void editSource(int sourceId, String name, double total) {
 		Statement stm = null;
+		ResultSet rs = null, rs2 = null;
+		double actualTotal, countTotal = 0.0;
 		try {
 			stm = conn.createStatement();
-			stm.executeUpdate("update " + TABLE_SOURCE + " set name=\"" + name
-					+ "\", total=" + total + " where id=" + sourceId);
+			rs = stm.executeQuery("select total from " + TABLE_SOURCE
+					+ " where id=" + sourceId + ";");
+			if (rs.next()) {
+				actualTotal = rs.getDouble("total");
+				if (actualTotal != total) {
+					rs2 = stm.executeQuery("select income, outgoing from "
+							+ " where source_id=" + sourceId);
+					while (rs2.next()) {
+						countTotal -= rs2.getDouble("outgoing");
+						countTotal += rs2.getDouble("income");
+					}
+					stm.executeUpdate("update " + TABLE_SOURCE + " set name=\""
+							+ name + "\", total=" + (total + countTotal)
+							+ " where id=" + sourceId);
+				} else {
+					stm.executeUpdate("update " + TABLE_SOURCE + " set name=\""
+							+ name + "\" where id=" + sourceId);
+				}
+			}
+
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} finally {
@@ -308,22 +323,24 @@ public class DataBase {
 		Statement stm = null;
 		try {
 			stm = conn.createStatement();
-
 			stm.executeUpdate("insert into "
 					+ TABLE_MOVEMENT
 					+ "(source_id, name, movement_date, income, outgoing) values ("
 					+ sourceId + ", \"" + name + "\", \"" + movementDate
 					+ "\", " + income + ", " + outgoing + ");");
+			System.out
+					.println("sql newMovement: "
+							+ "insert into "
+							+ TABLE_MOVEMENT
+							+ "(source_id, name, movement_date, income, outgoing) values ("
+							+ sourceId + ", \"" + name + "\", \""
+							+ movementDate + "\", " + income + ", " + outgoing
+							+ ");");
 			if (outgoing > 0.0) {
-				stm.executeUpdate("update " + TABLE_SOURCE
-						+ " set total=total-" + outgoing + " where id="
-						+ sourceId);
+				updateTotal(sourceId, -outgoing);
 			} else {
-				stm.executeUpdate("update " + TABLE_SOURCE
-						+ " set total=total+" + income + " where id="
-						+ sourceId);
+				updateTotal(sourceId, income);
 			}
-
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} finally {
@@ -340,13 +357,13 @@ public class DataBase {
 	public void editMovement(int movId, int sourceId, String name,
 			String movementDate, double income, double outgoing) {
 		Statement stm = null;
+		String[] movement = getMovement(movId);
 		try {
 			stm = conn.createStatement();
-			String[] movement = getMovement(movId);
 			stm.executeUpdate("update " + TABLE_MOVEMENT + " set source_id="
 					+ sourceId + ", name=\"" + name + "\", movement_date=\""
 					+ movementDate + "\", income=" + income + ", outgoing="
-					+ outgoing + ";");
+					+ outgoing + " where id=" + movId + ";");
 			if (income != Double.parseDouble(movement[3])
 					|| income != Double.parseDouble(movement[4])
 					|| outgoing != Double.parseDouble(movement[4])
@@ -369,6 +386,48 @@ public class DataBase {
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
+		}
+	}
+
+	/**
+	 * Delete a money source.
+	 * 
+	 * @param id
+	 *            Money source id that we want to delete.
+	 */
+	public void deleteSource(int id) {
+		Statement stm = null;
+		try {
+			stm = conn.createStatement();
+			stm.executeUpdate("delete from " + TABLE_SOURCE + " where id=" + id);
+			stm.executeUpdate("delete from " + TABLE_MOVEMENT
+					+ " where source_id=" + id);
+			stm.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Delete a movement
+	 * 
+	 * @param id
+	 *            Movement id that we want to delete.
+	 */
+	public void deleteMovement(int id) {
+		String[] movement = getMovement(id);
+		Statement stm = null;
+		updateTotal(Integer.parseInt(movement[6]),
+				-Double.parseDouble(movement[3]));
+		updateTotal(Integer.parseInt(movement[6]),
+				Double.parseDouble(movement[4]));
+		try {
+			stm = conn.createStatement();
+			stm.executeUpdate("delete from " + TABLE_MOVEMENT + " where id="
+					+ id);
+			stm.close();
+		} catch (SQLException e) {
+			e.printStackTrace();
 		}
 	}
 }
