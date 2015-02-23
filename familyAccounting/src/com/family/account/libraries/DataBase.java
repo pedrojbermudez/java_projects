@@ -170,8 +170,6 @@ public class DataBase {
 			stm = conn.createStatement();
 			stm.executeUpdate("update " + TABLE_SOURCE + " set total=total+"
 					+ total + " where id=" + sourceId + ";");
-			System.out.println("sql updateTotal: " + "update " + TABLE_SOURCE + " set total=total+"
-					+ total + " where id=" + sourceId + ";");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -200,7 +198,6 @@ public class DataBase {
 	}
 
 	public String[] getMovement(int id) {
-		System.out.println(id);
 		Statement stm = null;
 		ResultSet rs = null;
 		String[] result = new String[7];
@@ -328,14 +325,6 @@ public class DataBase {
 					+ "(source_id, name, movement_date, income, outgoing) values ("
 					+ sourceId + ", \"" + name + "\", \"" + movementDate
 					+ "\", " + income + ", " + outgoing + ");");
-			System.out
-					.println("sql newMovement: "
-							+ "insert into "
-							+ TABLE_MOVEMENT
-							+ "(source_id, name, movement_date, income, outgoing) values ("
-							+ sourceId + ", \"" + name + "\", \""
-							+ movementDate + "\", " + income + ", " + outgoing
-							+ ");");
 			if (outgoing > 0.0) {
 				updateTotal(sourceId, -outgoing);
 			} else {
