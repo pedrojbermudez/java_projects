@@ -10,6 +10,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Vector;
 
 import javax.swing.ImageIcon;
@@ -27,6 +29,7 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.table.TableColumn;
+import javax.xml.transform.SourceLocator;
 
 import com.family.account.libraries.DataBase;
 
@@ -53,6 +56,7 @@ public class MainSource extends JPanel implements ActionListener {
 	private static JComboBox<String> list, month, day, year;
 	private static DataBase db = new DataBase(DATABASE_PATH);
 	private static JTable table;
+	private int startIndex = 0, endIndex = 1000;
 	private int databaseId;
 
 	/**
@@ -84,7 +88,7 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			break;
 		case 1:
-			listData = db.getMovements();
+			listData = db.getMovements(0, 100);
 			numCol = 6;
 			columnNames = MOVEMENT_NAME_COL;
 			if (listData == null) {
@@ -121,7 +125,8 @@ public class MainSource extends JPanel implements ActionListener {
 		JButton editButton = new JButton(EDIT);
 		String[] getter;
 		ArrayList<String[]> sourceList = db.getSources();
-		ArrayList<String> tmp = new ArrayList<String>();
+		Vector tmp = new Vector();
+		Map<Integer, Integer> pos = new HashMap<Integer, Integer>();
 
 		frame2 = new JFrame();
 		frame2.setAlwaysOnTop(true);
@@ -194,10 +199,12 @@ public class MainSource extends JPanel implements ActionListener {
 			frame2.setTitle("Edit Movement");
 
 			for (int i = 0; i < sourceList.size(); i++) {
-				tmp.add(sourceList.get(i)[6] + " - " + sourceList.get(i)[1]);
+				tmp.addElement(new Item(Integer.parseInt(sourceList.get(i)[0]),
+						sourceList.get(i)[1]));
+				pos.put(Integer.parseInt(sourceList.get(i)[0]), i);
 			}
 
-			list = new JComboBox<String>(tmp.toArray(new String[tmp.size()]));
+			list = new JComboBox(tmp);
 			month = new JComboBox<String>(months);
 			day = new JComboBox<String>(days);
 			year = new JComboBox<String>(years);
@@ -275,7 +282,7 @@ public class MainSource extends JPanel implements ActionListener {
 					header.getY(), outgoing.getPreferredSize().width,
 					outgoing.getPreferredSize().height);
 
-			// Button creation.
+			// Button: creation.
 			editButton.setActionCommand("edit_movement_finished");
 			editButton.addActionListener(this);
 			pane.add(editButton);
@@ -296,7 +303,7 @@ public class MainSource extends JPanel implements ActionListener {
 			name.setText(getter[0]);
 			income.setText(getter[3]);
 			outgoing.setText(getter[4]);
-			list.setSelectedIndex(Integer.parseInt(getter[6]) - 1);
+			list.setSelectedIndex(pos.get(Integer.parseInt(getter[6])));
 			month.setSelectedIndex(Integer.parseInt(dateSplit[1]) - 1);
 			day.setSelectedIndex(Integer.parseInt(dateSplit[2]) - 1);
 			year.setSelectedIndex(Integer.parseInt(dateSplit[0])
@@ -785,7 +792,7 @@ public class MainSource extends JPanel implements ActionListener {
 							Double.parseDouble(total.getText()));
 					frame2.dispatchEvent(new WindowEvent(frame2,
 							WindowEvent.WINDOW_CLOSING));
-					createAndShowGUI(0);
+					//createAndShowGUI(0);
 				} else {
 					JOptionPane.showMessageDialog(null,
 							"Number format incorrect.");
@@ -1027,8 +1034,8 @@ public class MainSource extends JPanel implements ActionListener {
 					JOptionPane.showMessageDialog(null,
 							"Both income and outgoing can't be empty.");
 				}
+
 			}
-			createAndShowGUI(1);
 			break;
 		case "cancel":
 			// Exit in create or edit frame.
@@ -1052,6 +1059,7 @@ public class MainSource extends JPanel implements ActionListener {
 	 * @return
 	 */
 	private static void createAndShowGUI(int mode) {
+		long starTime = System.nanoTime();
 		MainSource mainSource = new MainSource(mode);
 		JMenuBar menuBar = mainSource.createMenuBar(mode);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -1062,6 +1070,8 @@ public class MainSource extends JPanel implements ActionListener {
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
+		long endTime = System.nanoTime();
+		System.out.println((endTime - starTime)+"ns");
 	}
 
 	/**
@@ -1102,6 +1112,7 @@ public class MainSource extends JPanel implements ActionListener {
 
 	public static void main(String[] args) {
 		db.createTables();
+		
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
