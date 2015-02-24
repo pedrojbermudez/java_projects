@@ -8,7 +8,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-
 public class DataBase {
 	private String path;
 	private static Connection conn;
@@ -81,13 +80,15 @@ public class DataBase {
 		}
 	}
 
-	public ArrayList<String[]> getMovements() {
+	public ArrayList<String[]> getMovements(int startIndex, int endIndex) {
 		Statement stm = null;
 		ResultSet rs = null;
 		ArrayList<String[]> result = null;
 		try {
 			stm = conn.createStatement();
-			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT + ";");
+			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT
+					+ " order by movement_date desc limit " + startIndex + ", "
+					+ endIndex + ";");
 			result = new ArrayList<String[]>();
 			while (rs.next()) {
 				String[] arrayTmp = rs.getString("movement_date").split("-");
@@ -170,6 +171,9 @@ public class DataBase {
 			stm = conn.createStatement();
 			stm.executeUpdate("update " + TABLE_SOURCE + " set total=total+"
 					+ total + " where id=" + sourceId + ";");
+			System.out.println("sql updateTotal: " + "update " + TABLE_SOURCE
+					+ " set total=total+" + total + " where id=" + sourceId
+					+ ";");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
@@ -198,6 +202,7 @@ public class DataBase {
 	}
 
 	public String[] getMovement(int id) {
+		System.out.println(id);
 		Statement stm = null;
 		ResultSet rs = null;
 		String[] result = new String[7];
@@ -325,6 +330,14 @@ public class DataBase {
 					+ "(source_id, name, movement_date, income, outgoing) values ("
 					+ sourceId + ", \"" + name + "\", \"" + movementDate
 					+ "\", " + income + ", " + outgoing + ");");
+			System.out
+					.println("sql newMovement: "
+							+ "insert into "
+							+ TABLE_MOVEMENT
+							+ "(source_id, name, movement_date, income, outgoing) values ("
+							+ sourceId + ", \"" + name + "\", \""
+							+ movementDate + "\", " + income + ", " + outgoing
+							+ ");");
 			if (outgoing > 0.0) {
 				updateTotal(sourceId, -outgoing);
 			} else {
