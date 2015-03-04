@@ -2,13 +2,13 @@ package com.family.account.mainProgram;
 
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.GridLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,13 +29,12 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.table.TableColumn;
-import javax.xml.transform.SourceLocator;
 
 import com.family.account.libraries.DataBase;
 
-public class MainSource extends JPanel implements ActionListener {
-	private static final long serialVersionUID = -3040429246924352278L;
+public class MainSource implements ActionListener {
 	private static final String REGEX_DECIMAL = "\\d+([.]\\d{1,2})?";
+	private static final String REGEX_NUMBER = "\\d+";
 	private final String ENTER = "Enter";
 	private final String CANCEL = "Cancel";
 	private final String EDIT = "Edit";
@@ -45,19 +44,26 @@ public class MainSource extends JPanel implements ActionListener {
 	private final String[] MOVEMENT_NAME_COL = { "#", "Name", "Source", "Date",
 			"Income", "Outgoing" };
 	private final static String DATABASE_PATH = "program_file";
-
+	private static JPanel panel;
 	private String[] columnNames;
 	private Object[][] rawData;
 	private ArrayList<String[]> listData;
 	private int numCol;
 	private static JFrame frame = new JFrame("Family Accounting");
-	private static JFrame frame2 = new JFrame("Family Accounting");
-	private static JTextField name, total, income, outgoing;
-	private static JComboBox<String> list, month, day, year;
+	private static JFrame frame2;
+	private static JTextField name, total, income, outgoing, actualPageInput;
+	JComboBox<Item> list;
+	static JComboBox<Integer> combo = new JComboBox<Integer>();
+	private static JComboBox<String> month, day, year;
 	private static DataBase db = new DataBase(DATABASE_PATH);
 	private static JTable table;
-	private int startIndex = 0, endIndex = 1000;
+	private static int actualPage = 0;
+	private static int elementsPerPage = 25;
+	private int totalPages = 0;
 	private int databaseId;
+	private static int mode = 0;
+
+	private GridBagConstraints c = new GridBagConstraints();
 
 	/**
 	 * Display the indicate table with mode.
@@ -65,11 +71,71 @@ public class MainSource extends JPanel implements ActionListener {
 	 * @param mode
 	 *            Number that indicates if it is money source or movement.
 	 */
-	public MainSource(int mode) {
-		super(new GridLayout(1, 0));
+	public MainSource(int mode, int start, int set) {
+		int totalElementsDB;
+		panel = new JPanel(new GridBagLayout());
+		JLabel info = new JLabel("Number of elements on screen: ");
+		c.gridy = 0;
+		c.anchor = GridBagConstraints.WEST;
+		panel.add(info, c);
+		c.gridy = 0;
+		combo.addActionListener(this);
+		combo.setActionCommand("pagination");
+		panel.add(combo, c);
 		switch (mode) {
 		case 0:
-			listData = db.getSources();
+			totalElementsDB = db.countRowSource();
+			System.out.println("total elements in db: " + totalElementsDB);
+			if (totalElementsDB > elementsPerPage) {
+				totalPages = (totalElementsDB / elementsPerPage) + 1;
+			}
+			System.out.println("total pages: " + totalPages);
+			System.out.println("actual page: " + actualPage);
+			if (totalPages > 1 && (actualPage + 1) > 1) {
+				// Previous button
+				JButton button = new JButton("Previous");
+				button.addActionListener(this);
+				button.setActionCommand("previous");
+				c.fill = GridBagConstraints.NONE;
+				c.gridy = 0;
+				c.gridx = 2;
+				c.insets = new Insets(0, 5, 0, 0);
+				panel.add(button, c);
+			}
+			if (totalPages > 1 && (actualPage + 1) < totalPages) {
+				// next button
+				JButton button = new JButton("Previous");
+				button = new JButton("Next");
+				button.addActionListener(this);
+				button.setActionCommand("next");
+				c.gridy = 0;
+				c.gridx = 3;
+				c.insets = new Insets(0, 5, 0, 0);
+				panel.add(button, c);
+			}
+			if (totalPages > 1) {
+				// Actual page / total pages label.
+
+				// An input text for actual page.
+				actualPageInput = new JTextField();
+				actualPageInput.setText(Integer.toString(actualPage + 1));
+				actualPageInput.setActionCommand("change_page");
+				actualPageInput.addActionListener(this);
+				actualPageInput.setPreferredSize(new Dimension(30, 20));
+				c.gridx = 4;
+				c.gridy = 0;
+				c.insets = new Insets(0, 15, 0, 0);
+				panel.add(actualPageInput, c);
+
+				// A label for /total pages.
+				JLabel pageNow = new JLabel("/" + totalPages);
+				c.gridx = 4;
+				c.gridy = 0;
+				c.insets = new Insets(0, 45, 0, 0);
+				panel.add(pageNow, c);
+			}
+			listData = db.getSources(actualPage * elementsPerPage,
+					elementsPerPage);
 			numCol = 3;
 			columnNames = SOURCE_NAME_COL;
 			if (listData == null) {
@@ -79,7 +145,8 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			if (rawData != null) {
 				for (int i = 0; i < listData.size(); i++) {
-					Object[] tmp = {i+1, listData.get(i)[1], listData.get(i)[2]};
+					Object[] tmp = { (i + (actualPage * elementsPerPage)) + 1,
+							listData.get(i)[1], listData.get(i)[2] };
 					rawData[i] = tmp;
 				}
 				createTable(rawData, columnNames);
@@ -88,7 +155,55 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			break;
 		case 1:
-			listData = db.getMovements(0, 100);
+			totalElementsDB = db.countRowMovements();
+			if (totalElementsDB > elementsPerPage) {
+				totalPages = totalElementsDB / elementsPerPage;
+			}
+
+			if (totalPages > 1 && (actualPage + 1) > 1) {
+				// Previous button
+				JButton button = new JButton("Previous");
+				button.addActionListener(this);
+				button.setActionCommand("previous");
+				c.fill = GridBagConstraints.NONE;
+				c.gridy = 0;
+				c.gridx = 2;
+				c.insets = new Insets(0, 5, 0, 0);
+				panel.add(button, c);
+			}
+			if (totalPages > 1 && (actualPage + 1) < totalPages) {
+				// next button
+				JButton button = new JButton("Previous");
+				button = new JButton("Next");
+				button.addActionListener(this);
+				button.setActionCommand("next");
+				c.gridy = 0;
+				c.gridx = 3;
+				c.insets = new Insets(0, 5, 0, 0);
+				panel.add(button, c);
+			}
+			if (totalPages > 1) {
+				// Actual page / total pages label.
+
+				// An input text for actual page.
+				actualPageInput = new JTextField();
+				actualPageInput.setText(Integer.toString(actualPage + 1));
+				actualPageInput.setActionCommand("change_page");
+				actualPageInput.addActionListener(this);
+				actualPageInput.setPreferredSize(new Dimension(30, 20));
+				c.gridx = 4;
+				c.gridy = 0;
+				c.insets = new Insets(0, 15, 0, 0);
+				panel.add(actualPageInput, c);
+
+				// A label for /total pages.
+				JLabel pageNow = new JLabel("/" + totalPages);
+				c.gridx = 4;
+				c.gridy = 0;
+				c.insets = new Insets(0, 45, 0, 0);
+				panel.add(pageNow, c);
+			}
+			listData = db.getMovements(start, set);
 			numCol = 6;
 			columnNames = MOVEMENT_NAME_COL;
 			if (listData == null) {
@@ -98,12 +213,14 @@ public class MainSource extends JPanel implements ActionListener {
 			}
 			if (rawData != null) {
 				for (int i = 0; i < listData.size(); i++) {
-					String[] tmp = {Integer.toString(i+1), listData.get(i)[1],
-							listData.get(i)[2], listData.get(i)[3],
-							listData.get(i)[4], listData.get(i)[5] };
+					Object[] tmp = { (i + (actualPage * elementsPerPage)) + 1,
+							listData.get(i)[1], listData.get(i)[2],
+							listData.get(i)[3], listData.get(i)[4],
+							listData.get(i)[5] };
 					rawData[i] = tmp;
 				}
 				createTable(rawData, columnNames);
+
 			} else {
 				createTable(columnNames, numCol);
 			}
@@ -125,7 +242,7 @@ public class MainSource extends JPanel implements ActionListener {
 		JButton editButton = new JButton(EDIT);
 		String[] getter;
 		ArrayList<String[]> sourceList = db.getSources();
-		Vector tmp = new Vector();
+		Vector<Item> tmp = new Vector<Item>();
 		Map<Integer, Integer> pos = new HashMap<Integer, Integer>();
 
 		frame2 = new JFrame();
@@ -204,7 +321,7 @@ public class MainSource extends JPanel implements ActionListener {
 				pos.put(Integer.parseInt(sourceList.get(i)[0]), i);
 			}
 
-			list = new JComboBox(tmp);
+			list = new JComboBox<Item>(tmp);
 			month = new JComboBox<String>(months);
 			day = new JComboBox<String>(days);
 			year = new JComboBox<String>(years);
@@ -383,8 +500,9 @@ public class MainSource extends JPanel implements ActionListener {
 			frame2.setMinimumSize(new Dimension(360, 120));
 			break;
 		case 1:
-			ArrayList<String[]> sourceList = db.getSources();
-			Vector tmp = new Vector();
+			ArrayList<String[]> sourceList = db.getSources(actualPage
+					* elementsPerPage, elementsPerPage);
+			Vector<Item> tmp = new Vector<Item>();
 			String[] months = { "January", "February", "March", "April", "May",
 					"June", "July", "August", "September", "October",
 					"November", "December" };
@@ -405,7 +523,7 @@ public class MainSource extends JPanel implements ActionListener {
 						sourceList.get(i)[1]));
 			}
 
-			list = new JComboBox(tmp);
+			list = new JComboBox<Item>(tmp);
 			month = new JComboBox<String>(months);
 			day = new JComboBox<String>(days);
 			year = new JComboBox<String>(years);
@@ -540,12 +658,18 @@ public class MainSource extends JPanel implements ActionListener {
 				col.setMinWidth(100);
 			}
 		}
-
 		JScrollPane scrollPane = new JScrollPane(table,
 				JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 				JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		add(scrollPane);
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+		c.gridy = 1;
+		c.gridx = 0;
+		c.weightx = 1;
+		c.weighty = 0;
+		c.gridwidth = 6;
+		c.fill = GridBagConstraints.BOTH;
+		panel.add(scrollPane, c);
+
 	}
 
 	/**
@@ -576,7 +700,7 @@ public class MainSource extends JPanel implements ActionListener {
 		JScrollPane scrollPane = new JScrollPane(table,
 				JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 				JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		add(scrollPane);
+		panel.add(scrollPane);
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 	}
 
@@ -585,7 +709,6 @@ public class MainSource extends JPanel implements ActionListener {
 		JMenu menu, submenu;
 		JMenuItem menuItem;
 		ImageIcon icon = new ImageIcon("exit.png");
-		;
 
 		switch (mode) {
 		case 0:
@@ -645,6 +768,7 @@ public class MainSource extends JPanel implements ActionListener {
 			menuItem.addActionListener(this);
 			menu.add(menuItem);
 			menuBar.add(menu);
+
 			break;
 
 		case 1:
@@ -703,6 +827,7 @@ public class MainSource extends JPanel implements ActionListener {
 			menuItem.addActionListener(this);
 			menu.add(menuItem);
 			menuBar.add(menu);
+
 			break;
 
 		default:
@@ -757,24 +882,25 @@ public class MainSource extends JPanel implements ActionListener {
 		String incomeTmp, outgoingTmp, monthTmp, dayTmp, date;
 		double incomeResult, outgoingResult;
 		int selectedRow;
-
 		switch (e.getActionCommand()) {
 		case "new_source":
 			// User clicks on the menu in File -> New -> Money Source
-
-			createAndShowGUI(0, false);
+			mode = 0;
+			createAndShowGUI(mode, false);
 			break;
 		case "new_movement":
 			// User clicks on the menu in File -> New -> Movement
-
-			createAndShowGUI(1, false);
+			mode = 1;
+			createAndShowGUI(mode, false);
 			break;
 		case "edit_source":
 			// User clicks on the menu in File -> Edit Money Source
 
 			selectedRow = table.getSelectedRow();
 			if (selectedRow != -1) {
-				createAndShowGUI(0, Integer.parseInt(listData.get(selectedRow)[0]));
+				mode = 0;
+				createAndShowGUI(mode,
+						Integer.parseInt(listData.get(selectedRow)[0]));
 			} else {
 				JOptionPane.showMessageDialog(null, "Select a money source.");
 			}
@@ -792,7 +918,9 @@ public class MainSource extends JPanel implements ActionListener {
 							Double.parseDouble(total.getText()));
 					frame2.dispatchEvent(new WindowEvent(frame2,
 							WindowEvent.WINDOW_CLOSING));
-					//createAndShowGUI(0);
+					actualPage = 0;
+					mode = 0;
+					createAndShowGUI(mode, actualPage, elementsPerPage);
 				} else {
 					JOptionPane.showMessageDialog(null,
 							"Number format incorrect.");
@@ -812,7 +940,8 @@ public class MainSource extends JPanel implements ActionListener {
 
 			selectedRow = table.getSelectedRow();
 			if (selectedRow != -1) {
-				createAndShowGUI(1, Integer.parseInt(listData.get(selectedRow)[0]));
+				createAndShowGUI(1,
+						Integer.parseInt(listData.get(selectedRow)[0]));
 			} else {
 				JOptionPane.showMessageDialog(null, "Select a movement.");
 			}
@@ -882,7 +1011,9 @@ public class MainSource extends JPanel implements ActionListener {
 								Double.parseDouble(outgoing.getText()));
 						frame2.dispatchEvent(new WindowEvent(frame2,
 								WindowEvent.WINDOW_CLOSING));
-						createAndShowGUI(1);
+						mode = 1;
+						actualPage = 0;
+						createAndShowGUI(mode, actualPage, elementsPerPage);
 					}
 
 				} else {
@@ -913,10 +1044,12 @@ public class MainSource extends JPanel implements ActionListener {
 								"Are you sure you want to delete? Also all movements will be deleted.",
 								"Confirm", JOptionPane.YES_NO_OPTION);
 				if (confirm == 0) {
-					
+
 					db.deleteSource(Integer.parseInt(listData.get(selectedRow)[0]));
-					createAndShowGUI(0);
-				} 
+					mode = 0;
+					actualPage = 0;
+					createAndShowGUI(mode, actualPage, elementsPerPage);
+				}
 			} else {
 				JOptionPane.showMessageDialog(null,
 						"Please select a money source.");
@@ -927,7 +1060,8 @@ public class MainSource extends JPanel implements ActionListener {
 			selectedRow = table.getSelectedRow();
 			if (selectedRow != -1) {
 				db.deleteMovement(Integer.parseInt(listData.get(selectedRow)[0]));
-				createAndShowGUI(1);
+				mode = 1;
+				createAndShowGUI(mode, actualPage, elementsPerPage);
 			} else {
 				JOptionPane
 						.showMessageDialog(null, "Please select a movement.");
@@ -935,13 +1069,15 @@ public class MainSource extends JPanel implements ActionListener {
 			break;
 		case "view_source":
 			// User clicks on the menu in View -> View Money Source.
-
-			createAndShowGUI(0);
+			mode = 0;
+			actualPage = 0;
+			createAndShowGUI(mode, actualPage, elementsPerPage);
 			break;
 		case "view_movements":
 			// User clicks on the menu in View -> View Movement.
-
-			createAndShowGUI(1);
+			mode = 1;
+			actualPage = 0;
+			createAndShowGUI(mode, actualPage, elementsPerPage);
 			break;
 		case "create_source":
 			// User clicks on accept button in create money source.
@@ -954,7 +1090,9 @@ public class MainSource extends JPanel implements ActionListener {
 							Double.parseDouble(total.getText()));
 					frame2.dispatchEvent(new WindowEvent(frame2,
 							WindowEvent.WINDOW_CLOSING));
-					createAndShowGUI(0);
+					mode = 0;
+					actualPage = 0;
+					createAndShowGUI(mode, actualPage, elementsPerPage);
 				}
 
 			} else {
@@ -966,6 +1104,27 @@ public class MainSource extends JPanel implements ActionListener {
 							"Number format incorrect.");
 				}
 			}
+			break;
+		case "pagination":
+			elementsPerPage = combo.getItemAt(combo.getSelectedIndex());
+			createAndShowGUI(mode, actualPage * elementsPerPage,
+					elementsPerPage);
+			break;
+		case "change_page":
+			if (actualPageInput.getText().matches(REGEX_NUMBER)) {
+				if (Integer.parseInt(actualPageInput.getText()) > 0) {
+					actualPage = Integer.parseInt(actualPageInput.getText()) - 1;
+					createAndShowGUI(mode, actualPage * elementsPerPage,
+							elementsPerPage);
+				} else {
+					JOptionPane.showMessageDialog(null,
+							"Invalid number. Number must be 1 or greater.");
+				}
+
+			} else {
+				JOptionPane.showMessageDialog(null, "Invalid number format");
+			}
+
 			break;
 		case "create_movement":
 			// Called when user clicks on accept button in create movement.
@@ -1020,7 +1179,9 @@ public class MainSource extends JPanel implements ActionListener {
 								outgoingResult);
 						frame2.dispatchEvent(new WindowEvent(frame2,
 								WindowEvent.WINDOW_CLOSING));
-						createAndShowGUI(1);
+						mode = 1;
+						actualPage = 0;
+						createAndShowGUI(mode, actualPage, elementsPerPage);
 					}
 
 				} else {
@@ -1043,6 +1204,16 @@ public class MainSource extends JPanel implements ActionListener {
 			frame2.dispatchEvent(new WindowEvent(frame2,
 					WindowEvent.WINDOW_CLOSING));
 			break;
+		case "next":
+			actualPage++;
+			createAndShowGUI(mode, actualPage * elementsPerPage,
+					elementsPerPage);
+			break;
+		case "previous":
+			actualPage--;
+			createAndShowGUI(mode, actualPage * elementsPerPage,
+					elementsPerPage);
+			break;
 		case "exit":
 			// Close the application.
 
@@ -1058,20 +1229,20 @@ public class MainSource extends JPanel implements ActionListener {
 	 *            It indicates if must be displayed money source or movement.
 	 * @return
 	 */
-	private static void createAndShowGUI(int mode) {
+	private static void createAndShowGUI(int mode, int page, int set) {
 		long starTime = System.nanoTime();
-		MainSource mainSource = new MainSource(mode);
+		MainSource mainSource = new MainSource(mode, page, set);
 		JMenuBar menuBar = mainSource.createMenuBar(mode);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setJMenuBar(menuBar);
-		mainSource.setOpaque(true);
-		frame.setContentPane(mainSource);
+		panel.setOpaque(true);
+		frame.setContentPane(panel);
 		frame.pack();
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
 		long endTime = System.nanoTime();
-		System.out.println((endTime - starTime)+"ns");
+		System.out.println((endTime - starTime) + "ns");
 	}
 
 	/**
@@ -1112,11 +1283,18 @@ public class MainSource extends JPanel implements ActionListener {
 
 	public static void main(String[] args) {
 		db.createTables();
-		
+		combo.addItem(10);
+		combo.addItem(25);
+		combo.addItem(50);
+		combo.addItem(100);
+		combo.setSelectedItem(elementsPerPage);
+		if (System.getProperty("os.name").contains("Linux")) {
+
+		}
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
-				createAndShowGUI(0);
+				createAndShowGUI(mode, actualPage, elementsPerPage);
 			}
 		});
 	}
