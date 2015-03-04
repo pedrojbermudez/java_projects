@@ -15,7 +15,7 @@ public class DataBase {
 			TABLE_MOVEMENT = "movements";
 
 	/**
-	 * A class with basic command and connection to a given database.
+	 * Constructor with database path.
 	 * 
 	 * @param path
 	 *            - The path which the DB is located.
@@ -26,9 +26,11 @@ public class DataBase {
 		connection();
 	}
 
+	/**
+	 * Constructor without arguments. Use a default path in the user home path.
+	 */
 	public DataBase() {
-		this(System.getProperty("user.home") + File.separator
-				+ "h4k234hyuds864g2");
+		this(System.getProperty("user.home") + File.separator + "program_file");
 	}
 
 	/**
@@ -51,6 +53,9 @@ public class DataBase {
 		}
 	}
 
+	/**
+	 * Create all tables if not exist.
+	 */
 	public void createTables() {
 		String createTable1 = "create table if not exists " + TABLE_SOURCE
 				+ " (id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -80,7 +85,17 @@ public class DataBase {
 		}
 	}
 
-	public ArrayList<String[]> getMovements(int startIndex, int endIndex) {
+	/**
+	 * Get all movements from all money source with limit for not overload the
+	 * program.
+	 * 
+	 * @param startIndex
+	 *            Start from that row.
+	 * @param numberElements
+	 *            The number of elements per page.
+	 * @return
+	 */
+	public ArrayList<String[]> getMovements(int startIndex, int numberElements) {
 		Statement stm = null;
 		ResultSet rs = null;
 		ArrayList<String[]> result = null;
@@ -88,7 +103,7 @@ public class DataBase {
 			stm = conn.createStatement();
 			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT
 					+ " order by movement_date desc limit " + startIndex + ", "
-					+ endIndex + ";");
+					+ numberElements + ";");
 			result = new ArrayList<String[]>();
 			while (rs.next()) {
 				String[] arrayTmp = rs.getString("movement_date").split("-");
@@ -116,14 +131,23 @@ public class DataBase {
 		return result;
 	}
 
-	public ArrayList<String[]> getSources(int startIndex, int set) {
+	/**
+	 * Get all sources.
+	 * 
+	 * @param startIndex
+	 *            Start from that row.
+	 * @param numberElements
+	 *            Number of elements per page.
+	 * @return
+	 */
+	public ArrayList<String[]> getSources(int startIndex, int numberElements) {
 		Statement stm = null;
 		ResultSet rs = null;
 		ArrayList<String[]> result = null;
 		try {
 			stm = conn.createStatement();
 			rs = stm.executeQuery("select * from " + TABLE_SOURCE + " limit "
-					+ startIndex + ", " + set + ";");
+					+ startIndex + ", " + numberElements + ";");
 			result = new ArrayList<String[]>();
 			while (rs.next()) {
 				String[] tmp = { Integer.toString(rs.getInt("id")),
@@ -146,6 +170,11 @@ public class DataBase {
 		return result;
 	}
 
+	/**
+	 * Get all sources without limit.
+	 * 
+	 * @return
+	 */
 	public ArrayList<String[]> getSources() {
 		Statement stm = null;
 		ResultSet rs = null;
@@ -175,6 +204,13 @@ public class DataBase {
 		return result;
 	}
 
+	/**
+	 * Get a source from an id.
+	 * 
+	 * @param id
+	 *            The source id that we wish to get.
+	 * @return
+	 */
 	public String[] getSource(int id) {
 		Statement stm = null;
 		ResultSet rs = null;
@@ -195,27 +231,53 @@ public class DataBase {
 		return result;
 	}
 
-	public void updateTotal(int sourceId, double total) {
+	/**
+	 * Update total filed when you put a new movement.
+	 * 
+	 * @param sourceId
+	 *            Source id that we need to update total value.
+	 * @param movement
+	 *            The income or outgoing value from the movement.
+	 */
+	public void updateTotal(int sourceId, double movement) {
 		Statement stm = null;
 		try {
 			stm = conn.createStatement();
 			stm.executeUpdate("update " + TABLE_SOURCE + " set total=total+"
-					+ total + " where id=" + sourceId + ";");
+					+ movement + " where id=" + sourceId + ";");
 			System.out.println("sql updateTotal: " + "update " + TABLE_SOURCE
-					+ " set total=total+" + total + " where id=" + sourceId
+					+ " set total=total+" + movement + " where id=" + sourceId
 					+ ";");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 	}
 
-	public ResultSet getMovementsFromSouce(int source_id) {
+	/**
+	 * Get all movements from a money source.
+	 * 
+	 * @param source_id
+	 *            Source id that we wish to get all its movements.
+	 * @return return ArrayList<String[]> with all movements.
+	 */
+	public ArrayList<String[]> getMovementsFromSouce(int source_id) {
 		Statement stm = null;
 		ResultSet rs = null;
+		ArrayList<String[]> movements = new ArrayList<String[]>();
 		try {
 			stm = conn.createStatement();
 			rs = stm.executeQuery("select * from " + TABLE_MOVEMENT
 					+ " where source_id=" + source_id + ";");
+			if (rs.next()) {
+				String[] tmp = { rs.getString("name"),
+						getSourceName(rs.getInt("source_id")),
+						rs.getString("movement_date"),
+						Double.toString(rs.getDouble("income")),
+						Double.toString(rs.getDouble("outgoing")),
+						Integer.toString(rs.getInt("id")),
+						Integer.toString(rs.getInt("source_id")), };
+				movements.add(tmp);
+			}
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} finally {
@@ -227,9 +289,16 @@ public class DataBase {
 				}
 			}
 		}
-		return rs;
+		return movements;
 	}
 
+	/**
+	 * Get a movement from the database.
+	 * 
+	 * @param id
+	 *            The movement id that we wish to get.
+	 * @return Return a String[] with the movement.
+	 */
 	public String[] getMovement(int id) {
 		System.out.println(id);
 		Statement stm = null;
@@ -262,6 +331,13 @@ public class DataBase {
 		return result;
 	}
 
+	/**
+	 * Get the name of the source. Useful when you want just the name.
+	 * 
+	 * @param sourceId
+	 *            Source id on the database.
+	 * @return Return a string with the name.
+	 */
 	public String getSourceName(int sourceId) {
 		Statement stm = null;
 		ResultSet rs = null;
@@ -289,6 +365,14 @@ public class DataBase {
 		return name;
 	}
 
+	/**
+	 * Create a new row on the database (table: money source).
+	 * 
+	 * @param name
+	 *            Name of the source.
+	 * @param total
+	 *            Total money.
+	 */
 	public void newSource(String name, double total) {
 		Statement stm = null;
 		try {
@@ -309,6 +393,16 @@ public class DataBase {
 		}
 	}
 
+	/**
+	 * Edit a money source.
+	 * 
+	 * @param sourceId
+	 *            Source id we wish to edit.
+	 * @param name
+	 *            Name of the source.
+	 * @param total
+	 *            Total money.
+	 */
 	public void editSource(int sourceId, String name, double total) {
 		Statement stm = null;
 		ResultSet rs = null, rs2 = null;
@@ -349,6 +443,20 @@ public class DataBase {
 		}
 	}
 
+	/**
+	 * Create a new row on the database (table: movement).
+	 * 
+	 * @param sourceId
+	 *            Source id on the database.
+	 * @param name
+	 *            Name of the movement.
+	 * @param movementDate
+	 *            Date of movement.
+	 * @param income
+	 *            Income value.
+	 * @param outgoing
+	 *            Outgoing value.
+	 */
 	public void newMovement(int sourceId, String name, String movementDate,
 			double income, double outgoing) {
 		Statement stm = null;
@@ -385,6 +493,22 @@ public class DataBase {
 		}
 	}
 
+	/**
+	 * Edit a movement.
+	 * 
+	 * @param movId
+	 *            movement id in the database that we wish to edit.
+	 * @param sourceId
+	 *            source id in the database.
+	 * @param name
+	 *            Name of the movement
+	 * @param movementDate
+	 *            Date of the movement.
+	 * @param income
+	 *            Income value.
+	 * @param outgoing
+	 *            Outgoing value.
+	 */
 	public void editMovement(int movId, int sourceId, String name,
 			String movementDate, double income, double outgoing) {
 		Statement stm = null;
@@ -462,6 +586,11 @@ public class DataBase {
 		}
 	}
 
+	/**
+	 * Number of row on the database (table: money source).
+	 * 
+	 * @return
+	 */
 	public int countRowSource() {
 		Statement stm = null;
 		ResultSet rs = null;
@@ -487,6 +616,11 @@ public class DataBase {
 		return result;
 	}
 
+	/**
+	 * Number of row on the data base(table_ movements)
+	 * 
+	 * @return total row of movements.
+	 */
 	public int countRowMovements() {
 		Statement stm = null;
 		ResultSet rs = null;
