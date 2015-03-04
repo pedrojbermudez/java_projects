@@ -305,6 +305,7 @@ public class MainSource implements ActionListener {
 					"November", "December" };
 			String[] days = new String[31];
 			String[] years = new String[TOTAL_YEARS];
+			
 			for (int i = 0; i < days.length; i++) {
 				days[i] = Integer.toString(i + 1);
 			}
