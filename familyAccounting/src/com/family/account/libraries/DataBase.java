@@ -116,6 +116,36 @@ public class DataBase {
 		return result;
 	}
 
+	public ArrayList<String[]> getSources(int startIndex, int set) {
+		Statement stm = null;
+		ResultSet rs = null;
+		ArrayList<String[]> result = null;
+		try {
+			stm = conn.createStatement();
+			rs = stm.executeQuery("select * from " + TABLE_SOURCE + " limit "
+					+ startIndex + ", " + set + ";");
+			result = new ArrayList<String[]>();
+			while (rs.next()) {
+				String[] tmp = { Integer.toString(rs.getInt("id")),
+						rs.getString("name"),
+						Double.toString(rs.getDouble("total")) };
+				result.add(tmp);
+			}
+
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (stm != null) {
+					stm.close();
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return result;
+	}
+
 	public ArrayList<String[]> getSources() {
 		Statement stm = null;
 		ResultSet rs = null;
@@ -192,7 +222,6 @@ public class DataBase {
 			if (stm != null) {
 				try {
 					stm.close();
-
 				} catch (SQLException e) {
 					e.printStackTrace();
 				}
@@ -431,5 +460,47 @@ public class DataBase {
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public int countRowSource() {
+		Statement stm = null;
+		ResultSet rs = null;
+		int result = 0;
+		try {
+			stm = conn.createStatement();
+			rs = stm.executeQuery("select count(id) as count from "
+					+ TABLE_SOURCE + ";");
+			if (rs.next()) {
+				result = rs.getInt("count");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (stm != null) {
+					stm.close();
+				}
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return result;
+	}
+
+	public int countRowMovements() {
+		Statement stm = null;
+		ResultSet rs = null;
+		int result = 0;
+		try {
+			stm = conn.createStatement();
+			rs = stm.executeQuery("select count(id) as count from "
+					+ TABLE_MOVEMENT + ";");
+			if (rs.next()) {
+				result = rs.getInt("count");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return result;
 	}
 }
