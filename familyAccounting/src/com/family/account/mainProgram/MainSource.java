@@ -31,6 +31,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.TableColumn;
 
 import com.family.account.libraries.DataBase;
+import com.family.account.libraries.GUITable;
 
 public class MainSource implements ActionListener {
 	private static final String REGEX_DECIMAL = "\\d+([.]\\d{1,2})?";
@@ -156,10 +157,12 @@ public class MainSource implements ActionListener {
 			break;
 		case 1:
 			totalElementsDB = db.countRowMovements();
+			System.out.println("total elements in db: " + totalElementsDB);
 			if (totalElementsDB > elementsPerPage) {
-				totalPages = totalElementsDB / elementsPerPage;
+				totalPages = (totalElementsDB / elementsPerPage) + 1;
 			}
-
+			System.out.println("total pages: " + totalPages);
+			System.out.println("actual page: " + actualPage);
 			if (totalPages > 1 && (actualPage + 1) > 1) {
 				// Previous button
 				JButton button = new JButton("Previous");
@@ -305,7 +308,6 @@ public class MainSource implements ActionListener {
 					"November", "December" };
 			String[] days = new String[31];
 			String[] years = new String[TOTAL_YEARS];
-			
 			for (int i = 0; i < days.length; i++) {
 				days[i] = Integer.toString(i + 1);
 			}
@@ -1014,7 +1016,7 @@ public class MainSource implements ActionListener {
 								WindowEvent.WINDOW_CLOSING));
 						mode = 1;
 						actualPage = 0;
-						createAndShowGUI(mode, actualPage, elementsPerPage);
+						createAndShowGUI(mode, actualPage*elementsPerPage, elementsPerPage);
 					}
 
 				} else {
@@ -1108,15 +1110,21 @@ public class MainSource implements ActionListener {
 			break;
 		case "pagination":
 			elementsPerPage = combo.getItemAt(combo.getSelectedIndex());
-			createAndShowGUI(mode, actualPage * elementsPerPage,
+			createAndShowGUI(mode, actualPage,
 					elementsPerPage);
 			break;
 		case "change_page":
 			if (actualPageInput.getText().matches(REGEX_NUMBER)) {
 				if (Integer.parseInt(actualPageInput.getText()) > 0) {
-					actualPage = Integer.parseInt(actualPageInput.getText()) - 1;
-					createAndShowGUI(mode, actualPage * elementsPerPage,
-							elementsPerPage);
+					if (Integer.parseInt(actualPageInput.getText()) <= totalPages) {
+						actualPage = Integer
+								.parseInt(actualPageInput.getText()) - 1;
+						createAndShowGUI(mode, actualPage * elementsPerPage,
+								elementsPerPage);
+					} else {
+						JOptionPane.showMessageDialog(null,
+								"Page can't be higher than total pages.");
+					}
 				} else {
 					JOptionPane.showMessageDialog(null,
 							"Invalid number. Number must be 1 or greater.");
@@ -1231,7 +1239,6 @@ public class MainSource implements ActionListener {
 	 * @return
 	 */
 	private static void createAndShowGUI(int mode, int page, int set) {
-		long starTime = System.nanoTime();
 		MainSource mainSource = new MainSource(mode, page, set);
 		JMenuBar menuBar = mainSource.createMenuBar(mode);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -1242,8 +1249,6 @@ public class MainSource implements ActionListener {
 		frame.setVisible(true);
 		frame.revalidate();
 		frame.repaint();
-		long endTime = System.nanoTime();
-		System.out.println((endTime - starTime) + "ns");
 	}
 
 	/**
@@ -1289,9 +1294,6 @@ public class MainSource implements ActionListener {
 		combo.addItem(50);
 		combo.addItem(100);
 		combo.setSelectedItem(elementsPerPage);
-		if (System.getProperty("os.name").contains("Linux")) {
-
-		}
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
