@@ -632,6 +632,8 @@ public class DataBase {
 			if (rs.next()) {
 				result = rs.getInt("count");
 			}
+			if(stm != null)
+				stm.close();
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
