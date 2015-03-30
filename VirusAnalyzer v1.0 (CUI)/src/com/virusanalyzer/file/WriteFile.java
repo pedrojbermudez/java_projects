@@ -46,8 +46,8 @@ public class WriteFile {
 		FileWriter fw = null;
 		PrintWriter pw = null;
 		try {
-			fw = new FileWriter(outputFile);
-			pw = new PrintWriter(fw, true);
+			fw = new FileWriter(outputFile, true);
+			pw = new PrintWriter(fw);
 			pw.println(text);
 			pw.close();
 		} catch (IOException e) {
